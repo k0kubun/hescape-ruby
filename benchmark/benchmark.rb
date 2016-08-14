@@ -5,6 +5,8 @@ require 'cgi/escape' # Require Ruby 2.3+
 
 Benchmark.ips do |x|
   str = ENV['ESCAPE_STRING'] || "https://github.com/k0kubun/hescape-ruby"
+  puts "escaping: #{str}"
+
   escape_table = {
     "'" => '&#39;',
     '&' => '&amp;',
