@@ -1,0 +1,7 @@
+box: ruby
+build:
+  steps:
+    - bundle-install
+    - script:
+        name: compile
+        code: bundle exec rake compile
