@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
 #include "hescape.h"
+#include <ruby/encoding.h>
+
+VALUE rb_mHescape;
 
 #ifdef __SSE4_2__
 # ifdef _MSC_VER
@@ -18,7 +22,7 @@
 # define unlikely(x) (x)
 #endif
 
-static const uint8_t *ESCAPED_STRING[] = {
+static const char *ESCAPED_STRING[] = {
   "",
   "&quot;",
   "&amp;",
@@ -59,13 +63,14 @@ static const char HTML_ESCAPE_TABLE[] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
-static uint8_t*
-ensure_allocated(uint8_t *buf, size_t size, size_t *asize)
+static char*
+ensure_allocated(char *buf, size_t size, size_t *asize)
 {
+  size_t new_size;
+
   if (size < *asize)
     return buf;
 
-  size_t new_size;
   if (*asize == 0) {
     new_size = size;
   } else {
@@ -109,15 +114,15 @@ find_escape_fast(const char *buf, size_t i, size_t size, int *found)
 #endif
 
 size_t
-hesc_escape_html(uint8_t **dest, const uint8_t *buf, size_t size)
+hesc_escape_html(char **dest, const char *buf, size_t size)
 {
   size_t asize = 0, esc_i, esize = 0, i = 0, rbuf_end = 0;
-  const uint8_t *esc;
-  uint8_t *rbuf = NULL;
+  const char *esc;
+  char *rbuf = NULL;
 
 # define DO_ESCAPE() { \
     esc = ESCAPED_STRING[esc_i]; \
-    rbuf = ensure_allocated(rbuf, sizeof(uint8_t) * (size + esize + ESC_LEN(esc_i) + 1), &asize); \
+    rbuf = ensure_allocated(rbuf, sizeof(char) * (size + esize + ESC_LEN(esc_i) + 1), &asize); \
     memmove(rbuf + rbuf_end, buf + (rbuf_end - esize), i - (rbuf_end - esize)); \
     memmove(rbuf + i + esize, esc, ESC_LEN(esc_i)); \
     rbuf_end = i + esize + ESC_LEN(esc_i); \
@@ -130,24 +135,24 @@ hesc_escape_html(uint8_t **dest, const uint8_t *buf, size_t size)
     i = find_escape_fast(buf, i, size, &found);
     if (!found) break;
 
-    esc_i = HTML_ESCAPE_TABLE[buf[i]];
-    if (esc_i) DO_ESCAPE();
+    esc_i = HTML_ESCAPE_TABLE[(unsigned char)buf[i]];
+    if (i < size && esc_i) DO_ESCAPE();
     i++;
   }
 # endif
 
   while (i < size) {
     // Loop here to skip non-escaped characters fast.
-    while (i < size && (esc_i = HTML_ESCAPE_TABLE[buf[i]]) == 0)
+    while (i < size && (esc_i = HTML_ESCAPE_TABLE[(unsigned char)buf[i]]) == 0)
       i++;
 
-    if (esc_i) DO_ESCAPE();
+    if (i < size && esc_i) DO_ESCAPE();
     i++;
   }
 
   if (rbuf_end == 0) {
     // Return given buf and size if there are no escaped characters.
-    *dest = (uint8_t *)buf;
+    *dest = (char *)buf;
     return size;
   } else {
     // Copy pending characters including NULL character.
@@ -156,4 +161,30 @@ hesc_escape_html(uint8_t **dest, const uint8_t *buf, size_t size)
     *dest = rbuf;
     return size + esize;
   }
+}
+
+static VALUE
+rb_escape_html(RB_UNUSED_VAR(VALUE self), VALUE value)
+{
+  char *buf;
+  unsigned int size;
+  VALUE str;
+
+  Check_Type(value, T_STRING);
+  str = rb_convert_type(value, T_STRING, "String", "to_s");
+
+  size = hesc_escape_html(&buf, RSTRING_PTR(str), RSTRING_LEN(str));
+  if (size > RSTRING_LEN(str)) {
+    str = rb_enc_str_new(buf, size, rb_utf8_encoding());
+    free((void *)buf);
+  }
+
+  return str;
+}
+
+void
+Init_hescape(void)
+{
+  rb_mHescape = rb_define_module("Hescape");
+  rb_define_singleton_method(rb_mHescape, "escape_html", rb_escape_html, 1);
 }
