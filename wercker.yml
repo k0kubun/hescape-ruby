@@ -6,6 +6,9 @@ build:
         name: compile
         code: bundle exec rake compile
     - script:
+        name: spec
+        code: bundle exec rake spec
+    - script:
         name: "[bench] no escape"
         code: ESCAPE_STRING="https://github.com/k0kubun/hescape-ruby" bundle exec ruby benchmark/benchmark.rb
     - script:
