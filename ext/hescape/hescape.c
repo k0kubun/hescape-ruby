@@ -103,12 +103,13 @@ find_escape_fast(const char *buf, size_t i, size_t size, int *found)
       if (unlikely(index != 16)) {
         i += index;
         *found = 1;
-        break;
+        return i;
       }
       i += 16;
       left -= 16;
     } while(likely(left != 0));
   }
+  *found = 0;
   return i;
 }
 #endif
