@@ -171,7 +171,6 @@ rb_escape_html(RB_UNUSED_VAR(VALUE self), VALUE value)
   unsigned int size;
   VALUE str;
 
-  Check_Type(value, T_STRING);
   str = rb_convert_type(value, T_STRING, "String", "to_s");
 
   size = hesc_escape_html(&buf, RSTRING_PTR(str), RSTRING_LEN(str));
